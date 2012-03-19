@@ -1,0 +1,9 @@
+
+Fatal error: Out of memory (allocated 1639972864) (tried to allocate 32 bytes) in C:\www\workspace\AI2012\Blatt2\UniformCostSearch.php on line 180
+
+Call Stack:
+    0.0013     728728   1. {main}() C:\www\workspace\AI2012\Blatt2\UniformCostSearch.php:0
+    0.0014     729392   2. UniformCostSearch->__construct() C:\www\workspace\AI2012\Blatt2\UniformCostSearch.php:3
+    0.0014     770416   3. UniformCostSearch->handler() C:\www\workspace\AI2012\Blatt2\UniformCostSearch.php:18
+    0.0015     770960   4. UniformCostSearch->createRandomList() C:\www\workspace\AI2012\Blatt2\UniformCostSearch.php:52
+
