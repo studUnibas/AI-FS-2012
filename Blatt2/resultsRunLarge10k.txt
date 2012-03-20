@@ -1,4 +1,3 @@
-
 C:\www\workspace\AI2012\Blatt2>echo 14:24:34.80 
 14:24:34.80
 
@@ -11,3 +10,5 @@ execution time for find shortest path: 12741 seconds
 
 C:\www\workspace\AI2012\Blatt2>echo 18:12:40.77 
 18:12:40.77
+
+#note: indeed, no know over 7000, so filename is wrong ;(  ala
