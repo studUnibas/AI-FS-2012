@@ -3,10 +3,12 @@
 /**
  * AI 2012 Unibas Exercises [kingmo,ala]
  *
- Usage: php UniformCostSearch.php options [args...]
+ Usage: php CostSearch.php options [args...]
  options: */
 class CostSearch
 {
+	public  $debug = 0;
+	
 	//number of knots
 	public  $knots;
 
@@ -82,24 +84,32 @@ class CostSearch
 	 * cost is computed by computeCost	 
 	 * 
 	 * @Note: please note that the startKnot is given! */
-	private function findShortestPath($startKnot)
+	public  function findShortestPath($startKnot)
 	{
-		$itterations = -1;
-		$homeKnot = $startKnot;
+		if ($this->debug>0)
+			echo "-- compute shortest path starting from $startKnot\n";
+		$this->shortestPath 		 = array($startKnot);
+		$this->shortestPathDistances = array();
+		$this->fullDistance 		 = 0;
+		$itterations 				 = -1;
+		$this->homeKnot = $homeKnot  = $startKnot;
+		$this->visitedKnots 		 = 0;
+		
 		do
 		{
-			
 			$shortestDistance = 0;
-			$nextKnot = -1;
+			$lowestCost		  = 0;
+			$nextKnot 		  = -1;
+			$lastKnot		  = $startKnot;
 
 			foreach($this->queue[$startKnot] as $childKnot => $distance)
 			{
 				if($nextKnot == $startKnot || in_array($childKnot, $this->shortestPath))
 					continue;
 					
-				$cost = $this->computeCost($distance);
+				$cost = $this->computeCost($startKnot, $lastKnot, $childKnot, $distance);
 
-				if(($shortestDistance == 0 OR $cost < $shortestDistance)
+				if(($shortestDistance == 0 OR $cost < $lowestCost)
 						&& $cost>0)
 				{
 					$shortestDistance 	= $distance;
@@ -108,21 +118,28 @@ class CostSearch
 				}
 			}
 
+			$this->visitedKnots++;
 			$this->shortestPath[] 			= $nextKnot;
 			$this->shortestPathDistances[]	= $shortestDistance;
 			$this->fullDistance  		   += $shortestDistance;
 			$this->shortestPathCost[]		= $lowestCost;
 			$this->fullCost		  		   += $lowestCost;
+			$this->treeWeight	  		   -= $shortestDistance;
 				
+			$lastKnot						= $startKnot;
 			$startKnot 						= $nextKnot;
+			//unset($this->queue[$nextKnot]);
 		}
 		while (!((count($this->shortestPath) == $this->knots || $nextKnot == -1)));
 
-		//go fucking home
-		$this->shortestPathDistances[] = $this->queue[$this->shortestPath[count($this->shortestPath)-1]][$homeKnot];
-		$this->fullDistance 		  += $this->queue[$this->shortestPath[count($this->shortestPath)-1]][$homeKnot];
-		$this->shortestPath[]		   = $homeKnot; // end knot is same as start knot
-
+		if ($nextKnot>-1)
+		{
+			//go fucking home
+			$this->shortestPathDistances[] = $this->queue[$nextKnot][$homeKnot];
+			$this->fullDistance 		  += $this->queue[$nextKnot][$homeKnot];
+			$this->shortestPath[]		   = $homeKnot; // end knot is same as start knot
+		}
+		
 		return true;
 	}
 
@@ -141,18 +158,25 @@ class CostSearch
 		return $input;
 	}
 	
-	public function printShortestPath() {
-		
-		echo "==< shortest path >==============================\n";
-		
-		$shortestPath = implode ( " => ", $this->shortestPath );
-		
-		echo $shortestPath . "\n";
-		echo @implode ( " + ", $this->shortestPathDistances ) . " = " . round ( $this->fullDistance, 2 ) . "\n";
-		echo "Length of path: " . round ( $this->fullDistance, 2 ) . "\n";
-		
-		echo "==< shortest path END >==========================\n";
-		$this->printExecutionTime ();
+	public function printShortestPath()
+	{
+		if (true or  $this->printStyle=="CSV")
+		{
+			echo "{$this->knots}	{$this->fullDistance}	{$this->executionTime}\n";
+		}
+		else
+		{
+			echo "==< shortest path >==============================\n";
+			
+			$shortestPath = implode ( " => ", $this->shortestPath );
+			
+			echo $shortestPath . "\n";
+			echo @implode ( " + ", $this->shortestPathDistances ) . " = " . round ( $this->fullDistance, 2 ) . "\n";
+			echo "Length of path: " . round ( $this->fullDistance, 2 ) . "\n";
+			
+			echo "==< shortest path END >==========================\n";
+			$this->printExecutionTime ();
+		}
 	}
 	
 	public function printExecutionTime() {
@@ -162,6 +186,7 @@ class CostSearch
 	public function loadFile($filename) {
 		if (empty ( $filename )) {
 			echo "Error: tried to open empty file!\n";
+			exit;
 			return false;
 		}
 		// number of cities
@@ -182,6 +207,7 @@ class CostSearch
 				$intValue = ( int ) $value;
 				if ($intValue != $value) {
 					echo "parser error\n";
+					exit;
 					return false;
 				}
 				$this->knots = $value;
@@ -201,6 +227,7 @@ class CostSearch
 		
 		if ($row > 0 && $row % $this->knots != 0) {
 			echo "parser error\n";
+			exit;
 			return false;
 		}
 	
@@ -351,6 +378,18 @@ class UniformCostSearch extends CostSearch
 				$this->getShortestPath();
 				$this->printShortestPath();
 				break;
+			case "getShortestPathOfExampleFiles":
+				$knots	  = isset($_SERVER["argv"][3]) ? $_SERVER["argv"][3] : 100;
+			
+				for ($i=4; $i<min(100, $knots); $i++)
+				{
+				$filename = sprintf("tsp/size%02d", $i).".tsp";
+				$this->loadFile ( $filename );
+				$this->getShortestPath();
+				$this->printShortestPath();
+				}
+				break;
+				
 			default:
 				$this->help();
 		}
@@ -362,13 +401,8 @@ class UniformCostSearch extends CostSearch
 		if(empty($this->queue)) {
 			echo "please load a list\n";
 		}
-	
-		//initialize va
-		$this->shortestPath = array($startKnot);
-		$this->shortestPathDistances = array();
-		$this->fullDistance = 0;
 		$start = microtime(true);
-	
+		
 		$this->findShortestPathBestFirst($startKnot);
 	
 		$this->executionTime = microtime(true) - $start;
@@ -410,7 +444,7 @@ class UniformCostSearch extends CostSearch
 		return $this->findShortestPath($nextKnot);
 	}
 	
-	private function computeCost($distance)
+	public  function computeCost($startKnot, $thisKnot, $childKnot, $distance)
 	{
 		return $distance;
 	}
@@ -418,7 +452,8 @@ class UniformCostSearch extends CostSearch
 
 /**  
  * astar getShortestPathOfFile [filename]		
- * astar getShortestPathOfRandomList [numberOfKnots]  
+ * astar getShortestPathOfRandomList [numberOfKnots] 
+ * astar getShortestPathOfExampleFiles //run files from website (sizeXX.tsp) 
  * */
 class AStarCostSearch extends CostSearch
 {
@@ -443,6 +478,17 @@ class AStarCostSearch extends CostSearch
 				$this->getShortestPath();
 				$this->printShortestPath();
 				break;
+			case "getShortestPathOfExampleFiles":
+				$knots	  = isset($_SERVER["argv"][3]) ? $_SERVER["argv"][3] : 100;
+				
+				for ($i=4; $i<min(100, $knots); $i++)
+				{
+					$filename = sprintf("tsp/size%02d", $i).".tsp";
+					$this->loadFile ( $filename );
+					$this->getShortestPath();
+					$this->printShortestPath();
+				}
+				break;
 			default:
 				$this->help();
 		}
@@ -453,34 +499,114 @@ class AStarCostSearch extends CostSearch
 	
 	public function getShortestPath($startKnot = 0)
 	{
+		$start = microtime(true);
 		
-		$this->buildSpanningTree ( $startKnot );
-		var_dump ( $this->queue );
-		var_dump ( $this->spanningTree );
+		$this->buildSpanningTree($this->queue, $startKnot);
+		$this->findShortestPath($startKnot);
 		
-		$this->queue = $this->spanningTree;
-		//$this->getShortestPath ();
-		//$this->printShortestPath ();
+		$this->executionTime = microtime(true) - $start;
+		
+	}
+	
+	public function getShortestPathTSP($startKnot = 0)
+	{
+		
 	}
 	
 /********** Controls ****/	
 	
-	private function computeCost($distance)
+	public  function computeCost($startKnot, $thisKnot, $childKnot, $distanceFromThisToChild)
 	{
+		if ($distanceFromThisToChild==0) return;
 		
+		if ($this->debug>0)
+		{
+			echo "start		child\n";
+			echo $startKnot . "\t\t" . $childKnot ."\n";
+		}
+		
+		//target state
+		if ($startKnot==$childKnot)
+			return 0;
+		
+		//not target state, but all visited
+		elseif ($this->knots==$this->visitedKnots)
+			return $this->fullDistance;
+		
+		//array_push($this->shortestPath, $childKnot);
+		//$this->buildSpanningTree($this->queue, $childKnot);
+		//array_pop($this->shortestPath);
+		
+		//woa, a priority queue would have been really cool
+		$min = 0;
+		foreach ($this->queue[$this->homeKnot] as $child => $distance)
+		{
+			if ($child==$childKnot) continue;
+			if (in_array($child, $this->shortestPath)) continue;
+			
+			if (($min==0 or $min>$distance) && $distance>0)
+			{
+				$min = $distance;
+				$minKnot = $child;
+			}
+		}
+		
+		$return = $min;
+		$min = 0;
+		
+		foreach ($this->queue[$childKnot] as $child => $distance)
+		{ 
+			if ($child==$childKnot) continue;
+			if (in_array($child, $this->shortestPath)) continue;
+			
+			if (($min==0 or $min>$distance) && !in_array($child, $this->shortestPath) && $distance>0)
+			{
+				$min = $distance;
+				$minKnot = $child;
+			}
+			
+		}
+		
+		$return += $min + $distanceFromThisToChild + $this->treeWeight;
+		
+		IF ($this->debug>1)
+		{
+			echo " h = $distanceFromThisToChild + $return + $min + {$this->treeWeight}";// + $distanceFromThisToChild"; 
+			// + $this->treeWeight;// + $distanceFromThisToChild; // + $distanceFromThisToChild;
+			echo " = $return \n";
+		}
+		
+		return $return;
+		 
+		return min($this->queue[$startKnot]) + min($this->queue[$thisKnot]) + $this->treeWeight;
+		
+		return $this->fullDistance + $distance + $this->treeWeight;
 	}
 	
-	private function buildSpanningTree($startKnot = 0, $totalWeight = 0)
+	private $lastCount = 0;
+	
+	/**
+	 * Build MST with Prim Algorithm
+	 * It would be a lot smarter to compute it once and then delete from it to compute subsets	 */
+	private function buildSpanningTree($queue, $startKnot = 0)
 	{
-		echo "-----building MST with {$this->knots} knots \n";
+		$lastCount = $this->knots- count($this->shortestPath);
+		if ($this->lastCount==$lastCount)
+			return;
+		$this->lastCount = $lastCount;
 		
-		$queue = $this->queue;
+		if ($this->debug>0)
+			echo "---building MST with " . ($this->knots- count($this->shortestPath)) . " knots \n";
+		
 		$idx = 0;
 		$this->spanningTree = array_fill ( 0, $this->knots, array_fill ( 0, $this->knots, 0 ) );
+		$this->treeWeight   = 0;
 		$closedList [0] = $startKnot;
 		
 		for($i = 0; $i<$this->knots - 1; $i ++)
 		{
+			if (in_array($i, $this->shortestPath))
+				continue;
 			$shortestEdge = max ($this->queue);
 			
 			for($col = 0; $col <= $idx; $col ++)
@@ -492,23 +618,24 @@ class AStarCostSearch extends CostSearch
 					if (($queue [$row] [$startKnot] < $shortestEdge) && ($queue [$row] [$startKnot] > 0))
 					{
 						$shortestEdge = $queue [$row] [$startKnot];
-						$prevNode = $startKnot;
-						$nextNode = $row;
+						$prevNode	  = $startKnot;
+						$nextNode 	  = $row;
 					}
 				}
 			}
 			
 			$closedList [++ $idx] = $startKnot = $nextNode;
 			
-			$this->spanningTree [$prevNode] [$nextNode] = $this->spanningTree [$nextNode] [$prevNode] = $this->queue [$prevNode] [$nextNode];
+			$this->spanningTree [$prevNode] [$nextNode] = $this->spanningTree [$nextNode] [$prevNode] = $queue [$prevNode] [$nextNode];
 			
-			$totalWeight += $queue [$prevNode] [$nextNode];
+			$this->treeWeight += $queue [$prevNode] [$nextNode];
 			
+			//just to go sure..., but we might test difference to sparse matrix and leave this away
 			for($a = 0; $a <= $idx; $a ++)
 			{
 				for($b = 0; $b <= $idx; $b ++)
 				{
-					$queue [$closedList [$a]] [$closedList [$b]] = $queue [$closedList [$b]] [$closedList [$a]] = 0;
+					$queue[$closedList [$a]] [$closedList [$b]] = $queue[$closedList [$b]] [$closedList [$a]] = 0;
 				}
 			}
 		}

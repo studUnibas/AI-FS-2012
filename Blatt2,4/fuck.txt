@@ -1,0 +1,6 @@
+==< shortest path >==============================
+0 => 1 => 5 => 7 => 6 => 3 => 2 => 4 => 0
+12 + 25 + 15 + 17 + 47 + 91 + 15 + 86 = 308
+Length of path: 308
+==< shortest path END >==========================
+execution time for find shortest path: 0 seconds
