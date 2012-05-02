@@ -23,7 +23,7 @@ class CostSearch
 	
 	public  $executionTime;
 
-	public  $options = array("CostSearchUtilities", "UniformCostSearch", "AStarCostSearch");
+	public  $options = array("CostSearchUtilities", "UniformCostSearch", "AStarCostSearch", "CPLL");
 	public  $handlerLevel = 1;
 
 	function __construct()
@@ -55,6 +55,10 @@ class CostSearch
 			 
 			case "astar":
 				new AStarCostSearch();
+				break;
+				
+			case "cpll":
+				new CPLL();
 				break;
 				 
 			default:
@@ -189,8 +193,7 @@ class CostSearch
 			exit;
 			return false;
 		}
-		// number of cities
-		
+
 		$file = fopen ( $filename, "r" );
 		
 		$row = - 1;
@@ -203,7 +206,8 @@ class CostSearch
 				continue;
 			}
 			
-			if ($row === - 1) {
+			if ($row === - 1)
+			{
 				$intValue = ( int ) $value;
 				if ($intValue != $value) {
 					echo "parser error\n";
@@ -260,6 +264,7 @@ class CostSearch
 		echo "==< Queue END >==========================\n";
 	}
 	
+	//makes no sense
 	public function printAllPaths() {
 		echo "\n--- Print all Paths ---\n";
 		
@@ -271,7 +276,7 @@ class CostSearch
 		}
 		
 		$iterator = 0;
-		$count = $knots;
+		//$count = $knots;
 		
 		foreach ( $queue as $i => $knots ) {
 			$this->allPaths [$cnt] ['knots'] [] = $i;
@@ -640,6 +645,211 @@ class AStarCostSearch extends CostSearch
 			}
 		}
 	}
+}
+
+/**
+ * cpll 30
+ * cpll 50
+ * cpll 70
+ * */
+class CPLL extends CostSearch
+{
+	public  $options	  = array();
+	public  $handlerLevel = 2;
+	
+	public  $clauses = array(); //klauseln
+	public  $values  = array();
+	
+	function CPLL()
+	{
+		$this->handler();
+	}
+	
+	public  function handler()
+	{
+		switch(@$_SERVER["argv"][$this->handlerLevel])
+		{
+			default:
+				$filename = isset($_SERVER["argv"][3]) ? $_SERVER["argv"][3] : "30";
+				$this->doCPLL($filename);
+				$this->printSolution();
+				break;
+		}
+	}
+
+	public  function doCPLL($filename)
+	{
+		//ini_set('xdebug.max_nesting_level', 100000);
+		$handle = opendir('cpll');
+			
+		$c = 0;
+		
+		//read all files and run cpll
+		while ($file = readdir($handle))
+		{
+			if (!strstr($file, "problem$filename"))
+				continue;
+			
+			$file = "idiotTest";
+				
+			$this->loadFile("cpll/".$file);
+			
+			$start = microtime(true);
+			
+			if ($this->solveCPLL($this->clauses))
+				$this->solution = array($file, microtime(true) - $start);
+			
+			$c++;
+			
+			if ($c>0) return;
+		}
+	}
+	
+	public  function solveCPLL($clauses)
+	{
+		$sat = true;
+		
+		//do
+		//{
+			if ($this->unsatisfiable($clauses))
+				return false;
+				
+			if (count($clauses)==0)
+				return true;
+			
+			if ($n = $this->unitPropagation($clauses))
+			{
+				$clauses = $this->simplify($clauses, $n);
+				return $this->solveCPLL($clauses);
+				//continue;
+			}
+			else
+			{
+				foreach ($clauses as $n => $clause)
+				{
+					foreach (array(true, false) as $d)
+					{
+						$clausesSplit = $this->simplify($clauses, null, $d);
+						$clausesSplit = $this->solveCPLL($clausesSplit);
+						if (!$this->unsatisfiable($clausesSplit))
+							return $clausesSplit;
+					}
+				}
+				return false;
+			}
+		//}
+		//	while ($sat);
+		
+		return false;
+		
+	}
+	
+	/**
+	 * @desc	return index of cause with only one literal */
+	public  function unitPropagation($clauses)
+	{
+		foreach ($clauses as $n => $clause)
+		{
+			if (count($clause)==1)
+				return $n;
+		}
+	}
+	
+	//dont think this is right yet
+	public  function simplify($clauses, $n = null, $d = null)
+	{		
+		if (empty($n))
+		{
+			foreach ($clauses as $itterator)
+			{
+				break;
+			}
+		}
+		else
+			$itterator = $clauses[$n];
+
+		foreach ($itterator as $literal)
+		{
+
+			if (empty($d))
+				$d = ($literal>0) ? true : false;
+			
+			foreach ($clauses as $n => $clause)
+			{
+				foreach ($clause as $m => $thisLiteral)
+				{
+					// a clause with exactly this litteral is true thus killed
+					if ($thisLiteral==$literal)
+					{
+						unset($clauses[$m]);
+						break;
+					}
+					
+					//all opposit literals are purged from their clauses
+					if ($thisLiteral+$literal==0)
+					{
+						unset($clauses[$n][$m]);
+						if (count($clauses[$n])==0)
+							unset($clauses[$n]);
+					}
+				}
+			}
+		}
+		return $clauses;
+	}
+	
+	public  function unsatisfiable($clauses)
+	{
+		foreach ($clauses as $clause)
+			if (count($clause)==0)
+				return true;
+	}
+	
+	public  function printSolution()
+	{
+		var_dump($this->solution);
+	}
+	
+	public  function loadFile($filename)
+	{
+		if (empty ( $filename )) {
+			echo "Error: tried to open empty file!\n";
+			exit;
+			return false;
+		}
+
+		$this->clauses = array();
+		
+		$file = fopen ( $filename, "r" );
+		
+		$row = 0;
+		
+		while ( ! feof ( $file ) )
+		{
+			$value = trim ( fgets ( $file ) );
+				
+			$pts = explode(" ", $value);
+			
+			foreach ($pts as $value)
+			{
+				if ((empty ( $value ) && $value != "0") || ! is_numeric ( $value )) {
+					continue;
+				}
+					
+				$intValue = ( int ) $value;
+				if ($intValue != $value) {
+					echo "parser error\n";
+					exit;
+					return false;
+				}
+				$this->clauses[$row][] = $value;
+			}		
+				
+			$row ++;
+		}
+		fclose ( $file );
+	}
+
 }
 
 $CostSearch = new CostSearch();
